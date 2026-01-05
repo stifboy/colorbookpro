@@ -2,22 +2,14 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { ColoringBookData, TargetAudience, ColoringPage } from "../types";
 
-// Safe helper to extract the API key from environment
-const getApiKey = () => {
-  try {
-    // Check both global process and window-bound process for compatibility
-    const key = (window as any).process?.env?.API_KEY || (process as any)?.env?.API_KEY;
-    return key || '';
-  } catch {
-    return '';
-  }
-};
-
-// Helper to get a fresh AI instance with the current environment key
+/**
+ * Helper to initialize the GenAI SDK.
+ * Always retrieves the key from process.env.API_KEY as per standard requirement.
+ */
 const getAI = () => {
-  const apiKey = getApiKey();
+  const apiKey = process.env.API_KEY;
   if (!apiKey) {
-    throw new Error("An API Key must be set in your environment (as 'API_KEY') or connected via the AI Studio dialog to run this application.");
+    throw new Error("API Key must be set in your environment variables (API_KEY).");
   }
   return new GoogleGenAI({ apiKey });
 };

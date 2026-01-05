@@ -11,6 +11,7 @@ import { Printer, ShieldCheck, Key, AlertCircle } from 'lucide-react';
 
 const App: React.FC = () => {
   const [hasApiKey, setHasApiKey] = useState<boolean>(true); 
+  const [isAIStudio, setIsAIStudio] = useState<boolean>(false);
   const [theme, setTheme] = useState('');
   const [author, setAuthor] = useState('');
   const [audience, setAudience] = useState<TargetAudience>(TargetAudience.KIDS);
@@ -25,33 +26,22 @@ const App: React.FC = () => {
     message: ''
   });
 
-  // Safely get the API key from potential environment locations
-  const getEnvKey = () => {
-    try {
-      // @ts-ignore
-      return (window as any).process?.env?.API_KEY || (process as any)?.env?.API_KEY || '';
-    } catch {
-      return '';
-    }
-  };
-
   useEffect(() => {
-    const checkKey = async () => {
+    const checkEnvironment = async () => {
       const aistudio = (window as any).aistudio;
-      const envKey = getEnvKey();
+      const envKey = !!process.env.API_KEY;
       
+      // Only trigger the "Connect" workflow if we are in an environment that explicitly supports it
       if (aistudio && typeof aistudio.hasSelectedApiKey === 'function') {
+        setIsAIStudio(true);
         const selected = await aistudio.hasSelectedApiKey();
-        setHasApiKey(selected || !!envKey);
+        setHasApiKey(selected || envKey);
       } else {
-        setHasApiKey(!!envKey);
+        setIsAIStudio(false);
+        setHasApiKey(envKey);
       }
     };
-    checkKey();
-    
-    // Periodically re-check if key becomes available (handles late injection)
-    const interval = setInterval(checkKey, 2000);
-    return () => clearInterval(interval);
+    checkEnvironment();
   }, []);
 
   const handleConnectKey = async () => {
@@ -59,18 +49,10 @@ const App: React.FC = () => {
     if (aistudio && typeof aistudio.openSelectKey === 'function') {
       await aistudio.openSelectKey();
       setHasApiKey(true);
-    } else {
-      alert("Dynamic key selection is not supported in this environment. Please ensure 'API_KEY' is set in your Vercel/environment settings and that the project is deployed correctly.");
     }
   };
 
   const handleGenerate = async () => {
-    const currentKey = getEnvKey();
-    if (!currentKey && !hasApiKey) {
-      alert("API Key missing. Please click 'Connect API Key' or ensure your environment variables are configured.");
-      return;
-    }
-
     setIsGenerating(true);
     try {
       setProgress({ step: 'text', total: pageCount + 1, current: 0, message: 'Drafting book structure...' });
@@ -115,11 +97,14 @@ const App: React.FC = () => {
       console.error("Gemini Generation Error:", err);
       const errorMsg = err?.message || "";
       
+      // Handle authentication failures by prompting for a key refresh if in AI Studio
       if (errorMsg.includes("Requested entity was not found") || errorMsg.includes("API Key") || errorMsg.includes("401") || errorMsg.includes("403")) {
-        setHasApiKey(false);
-        alert("API Key Issue: The key provided is invalid, missing, or has expired. If using Vercel, ensure the variable name is exactly 'API_KEY'.");
+        if (isAIStudio) {
+          setHasApiKey(false);
+        }
+        alert("Authentication Failed: Please ensure your API_KEY is correctly set in your environment.");
       } else {
-        alert(`Generation Error: ${errorMsg || "Check console for details."}`);
+        alert(`Generation Error: ${errorMsg || "An unexpected error occurred."}`);
       }
       setIsGenerating(false);
     }
@@ -150,7 +135,7 @@ const App: React.FC = () => {
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <Logo />
           <div className="flex items-center gap-4">
-            {!hasApiKey ? (
+            {isAIStudio && !hasApiKey ? (
               <button 
                 onClick={handleConnectKey}
                 className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md transition-all active:scale-95"
@@ -168,12 +153,12 @@ const App: React.FC = () => {
       </nav>
 
       <main className="max-w-7xl mx-auto px-6 py-12">
-        {!hasApiKey && (
+        {isAIStudio && !hasApiKey && (
           <div className="mb-8 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-4 text-amber-800 animate-in fade-in slide-in-from-top-2">
             <AlertCircle className="shrink-0" />
             <div className="text-sm">
-              <p className="font-bold">Missing Project Key</p>
-              <p>Generation requires a valid <strong>API_KEY</strong>. Ensure it's set in your Vercel environment or click the <strong>Connect</strong> button above if running in AI Studio.</p>
+              <p className="font-bold">API Key Selection Required</p>
+              <p>Generation requires a paid project key. Click <strong>Connect API Key</strong> in the header to link your project.</p>
             </div>
           </div>
         )}
@@ -182,7 +167,7 @@ const App: React.FC = () => {
           <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-24 mt-8">
             <div className="flex-1 space-y-8 text-center lg:text-left">
               <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-700 px-4 py-2 rounded-full text-sm font-bold">
-                🎨 Professional KDP Interiors
+                🎨 AI-Powered KDP Interiors
               </div>
               <h1 className="text-5xl lg:text-7xl font-black text-slate-900 leading-[1.1]">
                 Generate Your <br /> 
@@ -192,7 +177,7 @@ const App: React.FC = () => {
                 <br />In Seconds
               </h1>
               <p className="text-xl text-slate-500 max-w-2xl">
-                Optimized for Amazon KDP with industry-standard 0.75" safety margins. Create crisp, high-resolution line art interiors effortlessly.
+                Amazon KDP ready with industry-standard 0.75" safety margins. Create crisp, high-resolution line art interiors for kids or adults.
               </p>
             </div>
 
@@ -232,7 +217,7 @@ const App: React.FC = () => {
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
           <Logo size="sm" />
           <p className="text-slate-400 text-sm italic text-center md:text-left">
-            Automating Design for Creators. <br className="md:hidden" /> © {new Date().getFullYear()} ColorBook Pro.
+            Empowering Independent Publishers. <br className="md:hidden" /> © {new Date().getFullYear()} ColorBook Pro.
           </p>
         </div>
       </footer>
