@@ -2,11 +2,22 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { ColoringBookData, TargetAudience, ColoringPage } from "../types";
 
+// Safe helper to extract the API key from environment
+const getApiKey = () => {
+  try {
+    // Check both global process and window-bound process for compatibility
+    const key = (window as any).process?.env?.API_KEY || (process as any)?.env?.API_KEY;
+    return key || '';
+  } catch {
+    return '';
+  }
+};
+
 // Helper to get a fresh AI instance with the current environment key
 const getAI = () => {
-  const apiKey = process.env.API_KEY;
+  const apiKey = getApiKey();
   if (!apiKey) {
-    throw new Error("An API Key must be set when running in a browser. Please connect your project using the 'Connect API Key' button.");
+    throw new Error("An API Key must be set in your environment (as 'API_KEY') or connected via the AI Studio dialog to run this application.");
   }
   return new GoogleGenAI({ apiKey });
 };
@@ -47,9 +58,9 @@ export const generateBookMetadata = async (theme: string, audience: TargetAudien
     console.error("Failed to parse metadata", e);
     return {
       title: `${theme} Coloring Book`,
-      subtitle: `Creative designs for ${audience}`,
+      subtitle: `Relaxing and creative patterns for ${audience}`,
       author: authorName || "AI Artist",
-      introduction: "Welcome to your next creative adventure.",
+      introduction: "Welcome to this wonderful world of creativity!",
       copyrightText: `© ${new Date().getFullYear()}. All rights reserved.`
     };
   }
@@ -59,10 +70,10 @@ export const generateColoringPage = async (theme: string, audience: TargetAudien
   const ai = getAI();
   
   const basePrompt = audience === TargetAudience.ADULTS 
-    ? "High-resolution 2K line art coloring page. Extremely intricate patterns, clean sharp black outlines, zero shading, zero gray gradients, pure white background. Professional Zentangle or detailed illustration style. Subject: "
+    ? "High-resolution 2K line art coloring page. Complex, intricate Zentangle-inspired patterns, razor-sharp clean black outlines, zero shading, zero gray, pure white background. Subject: "
     : "Professional children's coloring page, bold thick black outlines, simple clear shapes, large coloring areas, friendly character, white background. No shading. Subject: ";
   
-  const prompt = `${basePrompt}${theme}, page ${pageIndex + 1}. Print-ready, high contrast, pure black and white line art.`;
+  const prompt = `${basePrompt}${theme}, page ${pageIndex + 1}. High contrast, 300DPI equivalent, pure black and white line art.`;
 
   const response = await ai.models.generateContent({
     model: 'gemini-3-pro-image-preview',
@@ -89,7 +100,7 @@ export const generateColoringPage = async (theme: string, audience: TargetAudien
   }
 
   if (!imageUrl) {
-    throw new Error("No image data returned from the model. Please ensure your project has Image Generation permissions.");
+    throw new Error("No image data returned from the model. Please verify your project has image generation capabilities enabled.");
   }
 
   return {

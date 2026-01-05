@@ -10,7 +10,7 @@ import Logo from './components/Logo';
 import { Printer, ShieldCheck, Key, AlertCircle } from 'lucide-react';
 
 const App: React.FC = () => {
-  const [hasApiKey, setHasApiKey] = useState<boolean>(true); // Assume true initially to prevent layout shift
+  const [hasApiKey, setHasApiKey] = useState<boolean>(true); 
   const [theme, setTheme] = useState('');
   const [author, setAuthor] = useState('');
   const [audience, setAudience] = useState<TargetAudience>(TargetAudience.KIDS);
@@ -25,38 +25,49 @@ const App: React.FC = () => {
     message: ''
   });
 
-  // Check for API key presence on mount
+  // Safely get the API key from potential environment locations
+  const getEnvKey = () => {
+    try {
+      // @ts-ignore
+      return (window as any).process?.env?.API_KEY || (process as any)?.env?.API_KEY || '';
+    } catch {
+      return '';
+    }
+  };
+
   useEffect(() => {
     const checkKey = async () => {
       const aistudio = (window as any).aistudio;
-      const envKey = process?.env?.API_KEY;
+      const envKey = getEnvKey();
       
       if (aistudio && typeof aistudio.hasSelectedApiKey === 'function') {
         const selected = await aistudio.hasSelectedApiKey();
-        // If aistudio is present, prioritize its state. If not, fallback to process.env
         setHasApiKey(selected || !!envKey);
       } else {
         setHasApiKey(!!envKey);
       }
     };
     checkKey();
+    
+    // Periodically re-check if key becomes available (handles late injection)
+    const interval = setInterval(checkKey, 2000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleConnectKey = async () => {
     const aistudio = (window as any).aistudio;
     if (aistudio && typeof aistudio.openSelectKey === 'function') {
       await aistudio.openSelectKey();
-      // Per instructions: assume success after triggering to mitigate race conditions
       setHasApiKey(true);
     } else {
-      alert("This environment does not support dynamic key selection. Please ensure API_KEY is set in your build environment.");
+      alert("Dynamic key selection is not supported in this environment. Please ensure 'API_KEY' is set in your Vercel/environment settings and that the project is deployed correctly.");
     }
   };
 
   const handleGenerate = async () => {
-    // Final check before starting
-    if (!process.env.API_KEY && !hasApiKey) {
-      alert("Please click the 'Connect API Key' button first to link your Google Cloud project.");
+    const currentKey = getEnvKey();
+    if (!currentKey && !hasApiKey) {
+      alert("API Key missing. Please click 'Connect API Key' or ensure your environment variables are configured.");
       return;
     }
 
@@ -102,13 +113,13 @@ const App: React.FC = () => {
 
     } catch (err: any) {
       console.error("Gemini Generation Error:", err);
+      const errorMsg = err?.message || "";
       
-      // Handle the case where the key is invalid or not found
-      if (err?.message?.includes("Requested entity was not found") || err?.message?.includes("API Key must be set")) {
+      if (errorMsg.includes("Requested entity was not found") || errorMsg.includes("API Key") || errorMsg.includes("401") || errorMsg.includes("403")) {
         setHasApiKey(false);
-        alert("Your API Key session has expired or is invalid. Please click 'Connect API Key' to reconnect.");
+        alert("API Key Issue: The key provided is invalid, missing, or has expired. If using Vercel, ensure the variable name is exactly 'API_KEY'.");
       } else {
-        alert(`Generation Error: ${err?.message || "An unexpected error occurred. Please check your console."}`);
+        alert(`Generation Error: ${errorMsg || "Check console for details."}`);
       }
       setIsGenerating(false);
     }
@@ -161,8 +172,8 @@ const App: React.FC = () => {
           <div className="mb-8 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-4 text-amber-800 animate-in fade-in slide-in-from-top-2">
             <AlertCircle className="shrink-0" />
             <div className="text-sm">
-              <p className="font-bold">API Key Required</p>
-              <p>You must click <strong>"Connect API Key"</strong> in the top right to link a paid Google Cloud project. <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" className="underline font-bold">Billing setup info</a>.</p>
+              <p className="font-bold">Missing Project Key</p>
+              <p>Generation requires a valid <strong>API_KEY</strong>. Ensure it's set in your Vercel environment or click the <strong>Connect</strong> button above if running in AI Studio.</p>
             </div>
           </div>
         )}
@@ -181,7 +192,7 @@ const App: React.FC = () => {
                 <br />In Seconds
               </h1>
               <p className="text-xl text-slate-500 max-w-2xl">
-                Amazon KDP ready with 0.75" safety margins. Create crisp, high-resolution line art interiors for kids or adults.
+                Optimized for Amazon KDP with industry-standard 0.75" safety margins. Create crisp, high-resolution line art interiors effortlessly.
               </p>
             </div>
 
@@ -220,8 +231,8 @@ const App: React.FC = () => {
       <footer className="mt-20 border-t border-slate-200 bg-white py-12 px-6">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
           <Logo size="sm" />
-          <p className="text-slate-400 text-sm italic">
-            Built for Authors & Illustrators. © {new Date().getFullYear()} ColorBook Pro.
+          <p className="text-slate-400 text-sm italic text-center md:text-left">
+            Automating Design for Creators. <br className="md:hidden" /> © {new Date().getFullYear()} ColorBook Pro.
           </p>
         </div>
       </footer>
