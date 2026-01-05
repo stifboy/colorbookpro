@@ -9,10 +9,8 @@ import LoadingOverlay from './components/LoadingOverlay';
 import Logo from './components/Logo';
 import { Printer, ShieldCheck, Key, AlertCircle } from 'lucide-react';
 
-// Removed explicit 'aistudio' global declaration as it conflicts with the environment's pre-defined AIStudio type.
-
 const App: React.FC = () => {
-  const [hasApiKey, setHasApiKey] = useState<boolean>(true); // Assume true initially to avoid flicker
+  const [hasApiKey, setHasApiKey] = useState<boolean>(true); // Assume true initially to prevent layout shift
   const [theme, setTheme] = useState('');
   const [author, setAuthor] = useState('');
   const [audience, setAudience] = useState<TargetAudience>(TargetAudience.KIDS);
@@ -27,13 +25,18 @@ const App: React.FC = () => {
     message: ''
   });
 
+  // Check for API key presence on mount
   useEffect(() => {
     const checkKey = async () => {
-      // Use cast to any to safely access aistudio which is managed by the environment
       const aistudio = (window as any).aistudio;
+      const envKey = process?.env?.API_KEY;
+      
       if (aistudio && typeof aistudio.hasSelectedApiKey === 'function') {
         const selected = await aistudio.hasSelectedApiKey();
-        setHasApiKey(selected);
+        // If aistudio is present, prioritize its state. If not, fallback to process.env
+        setHasApiKey(selected || !!envKey);
+      } else {
+        setHasApiKey(!!envKey);
       }
     };
     checkKey();
@@ -43,12 +46,20 @@ const App: React.FC = () => {
     const aistudio = (window as any).aistudio;
     if (aistudio && typeof aistudio.openSelectKey === 'function') {
       await aistudio.openSelectKey();
-      // Assume selection successful as per guidelines to mitigate potential race conditions
+      // Per instructions: assume success after triggering to mitigate race conditions
       setHasApiKey(true);
+    } else {
+      alert("This environment does not support dynamic key selection. Please ensure API_KEY is set in your build environment.");
     }
   };
 
   const handleGenerate = async () => {
+    // Final check before starting
+    if (!process.env.API_KEY && !hasApiKey) {
+      alert("Please click the 'Connect API Key' button first to link your Google Cloud project.");
+      return;
+    }
+
     setIsGenerating(true);
     try {
       setProgress({ step: 'text', total: pageCount + 1, current: 0, message: 'Drafting book structure...' });
@@ -91,12 +102,13 @@ const App: React.FC = () => {
 
     } catch (err: any) {
       console.error("Gemini Generation Error:", err);
-      // Reset key selection if the request fails due to key/project issues
-      if (err?.message?.includes("Requested entity was not found") || err?.message?.includes("API_KEY")) {
+      
+      // Handle the case where the key is invalid or not found
+      if (err?.message?.includes("Requested entity was not found") || err?.message?.includes("API Key must be set")) {
         setHasApiKey(false);
-        alert("API Key issue detected. Please click 'Connect API Key' to link a valid project.");
+        alert("Your API Key session has expired or is invalid. Please click 'Connect API Key' to reconnect.");
       } else {
-        alert(`Generation Failed: ${err?.message || "Check console for details"}`);
+        alert(`Generation Error: ${err?.message || "An unexpected error occurred. Please check your console."}`);
       }
       setIsGenerating(false);
     }
@@ -146,11 +158,11 @@ const App: React.FC = () => {
 
       <main className="max-w-7xl mx-auto px-6 py-12">
         {!hasApiKey && (
-          <div className="mb-8 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-4 text-amber-800">
+          <div className="mb-8 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-4 text-amber-800 animate-in fade-in slide-in-from-top-2">
             <AlertCircle className="shrink-0" />
             <div className="text-sm">
-              <p className="font-bold">Required Setup</p>
-              <p>You must select an API key from a paid GCP project to generate high-quality interiors. <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" className="underline font-bold">Learn about billing</a>.</p>
+              <p className="font-bold">API Key Required</p>
+              <p>You must click <strong>"Connect API Key"</strong> in the top right to link a paid Google Cloud project. <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" className="underline font-bold">Billing setup info</a>.</p>
             </div>
           </div>
         )}
@@ -159,18 +171,17 @@ const App: React.FC = () => {
           <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-24 mt-8">
             <div className="flex-1 space-y-8 text-center lg:text-left">
               <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-700 px-4 py-2 rounded-full text-sm font-bold">
-                🎨 AI-Powered KDP Interiors
+                🎨 Professional KDP Interiors
               </div>
               <h1 className="text-5xl lg:text-7xl font-black text-slate-900 leading-[1.1]">
-                Create Your <br /> 
+                Generate Your <br /> 
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600 font-hand">
                   Coloring Book
                 </span>
                 <br />In Seconds
               </h1>
               <p className="text-xl text-slate-500 max-w-2xl">
-                Optimized for Amazon KDP with 0.75" safety margins. 
-                Generate professional line art interiors with automated single-sided layout logic.
+                Amazon KDP ready with 0.75" safety margins. Create crisp, high-resolution line art interiors for kids or adults.
               </p>
             </div>
 
@@ -210,7 +221,7 @@ const App: React.FC = () => {
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
           <Logo size="sm" />
           <p className="text-slate-400 text-sm italic">
-            Automating KDP Interior Design. © {new Date().getFullYear()} ColorBook Pro.
+            Built for Authors & Illustrators. © {new Date().getFullYear()} ColorBook Pro.
           </p>
         </div>
       </footer>

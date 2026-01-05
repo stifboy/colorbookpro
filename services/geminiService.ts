@@ -2,10 +2,17 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { ColoringBookData, TargetAudience, ColoringPage } from "../types";
 
-// Generate professional metadata and structure for the coloring book
+// Helper to get a fresh AI instance with the current environment key
+const getAI = () => {
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) {
+    throw new Error("An API Key must be set when running in a browser. Please connect your project using the 'Connect API Key' button.");
+  }
+  return new GoogleGenAI({ apiKey });
+};
+
 export const generateBookMetadata = async (theme: string, audience: TargetAudience, authorName?: string): Promise<Partial<ColoringBookData>> => {
-  // Always create a new instance right before use to capture the latest selected API key
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = getAI();
   
   const authorInstruction = authorName ? `The author's name is "${authorName}". Use it.` : "Provide a professional author pseudonym.";
   
@@ -40,24 +47,22 @@ export const generateBookMetadata = async (theme: string, audience: TargetAudien
     console.error("Failed to parse metadata", e);
     return {
       title: `${theme} Coloring Book`,
-      subtitle: `Relaxing and creative patterns for ${audience}`,
-      author: authorName || "Coloring Master",
-      introduction: "Welcome to this wonderful world of creativity!",
-      copyrightText: `© ${new Date().getFullYear()} ${authorName || "Coloring Master"}. All rights reserved.`
+      subtitle: `Creative designs for ${audience}`,
+      author: authorName || "AI Artist",
+      introduction: "Welcome to your next creative adventure.",
+      copyrightText: `© ${new Date().getFullYear()}. All rights reserved.`
     };
   }
 };
 
-// Generate high-quality coloring page images using the specialized Pro image model
 export const generateColoringPage = async (theme: string, audience: TargetAudience, pageIndex: number): Promise<ColoringPage> => {
-  // Always create a new instance right before use to capture the latest selected API key
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = getAI();
   
   const basePrompt = audience === TargetAudience.ADULTS 
-    ? "Masterpiece level, high-resolution 2K line art coloring page. Complex, intricate Zentangle-inspired patterns, razor-sharp clean black outlines, zero shading, zero gray, purely white background. Subject: "
-    : "Professional children's coloring page, thick black outlines, simple clear shapes, large coloring areas, friendly character, white background. Subject: ";
+    ? "High-resolution 2K line art coloring page. Extremely intricate patterns, clean sharp black outlines, zero shading, zero gray gradients, pure white background. Professional Zentangle or detailed illustration style. Subject: "
+    : "Professional children's coloring page, bold thick black outlines, simple clear shapes, large coloring areas, friendly character, white background. No shading. Subject: ";
   
-  const prompt = `${basePrompt}${theme}, page ${pageIndex + 1}. High contrast, 300DPI equivalent, black and white line art only.`;
+  const prompt = `${basePrompt}${theme}, page ${pageIndex + 1}. Print-ready, high contrast, pure black and white line art.`;
 
   const response = await ai.models.generateContent({
     model: 'gemini-3-pro-image-preview',
@@ -73,7 +78,6 @@ export const generateColoringPage = async (theme: string, audience: TargetAudien
   });
 
   let imageUrl = '';
-  // Iterate through parts to find the image data as per Gemini 3 image output guidelines
   const candidate = response.candidates?.[0];
   if (candidate?.content?.parts) {
     for (const part of candidate.content.parts) {
@@ -85,7 +89,7 @@ export const generateColoringPage = async (theme: string, audience: TargetAudien
   }
 
   if (!imageUrl) {
-    throw new Error("No image data returned. Ensure your project has image generation permissions enabled.");
+    throw new Error("No image data returned from the model. Please ensure your project has Image Generation permissions.");
   }
 
   return {
