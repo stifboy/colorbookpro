@@ -66,8 +66,16 @@ const App: React.FC = () => {
       setTimeout(() => setIsGenerating(false), 1200);
 
     } catch (err: any) {
-      console.error(err);
-      alert("Generation error. Please ensure your API_KEY is correctly configured in your environment variables.");
+      console.error("Gemini Generation Error:", err);
+      const errorMsg = err?.message || "An unexpected error occurred.";
+      
+      alert(
+        `Generation Failed: ${errorMsg}\n\n` +
+        `Possible Fixes:\n` +
+        `1. Check your API_KEY in Vercel settings.\n` +
+        `2. IMPORTANT: You MUST redeploy your project on Vercel for new environment variables to take effect.\n` +
+        `3. Ensure your project has billing enabled if using high-tier models.`
+      );
       setIsGenerating(false);
     }
   };

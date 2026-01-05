@@ -3,7 +3,12 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { ColoringBookData, TargetAudience, ColoringPage } from "../types.ts";
 
 export const generateBookMetadata = async (theme: string, audience: TargetAudience, authorName?: string): Promise<Partial<ColoringBookData>> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) {
+    throw new Error("API key is missing from environment. Please set API_KEY in Vercel and redeploy.");
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
   
   const authorInstruction = authorName ? `The author's name is "${authorName}". Use it.` : "Provide a professional author pseudonym.";
   
@@ -31,7 +36,9 @@ export const generateBookMetadata = async (theme: string, audience: TargetAudien
   });
 
   try {
-    return JSON.parse(response.text);
+    const text = response.text;
+    if (!text) throw new Error("Empty response from AI");
+    return JSON.parse(text);
   } catch (e) {
     console.error("Failed to parse metadata", e);
     return {
@@ -45,7 +52,12 @@ export const generateBookMetadata = async (theme: string, audience: TargetAudien
 };
 
 export const generateColoringPage = async (theme: string, audience: TargetAudience, pageIndex: number): Promise<ColoringPage> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) {
+    throw new Error("API key is missing from environment. Please set API_KEY in Vercel and redeploy.");
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
   
   const basePrompt = audience === TargetAudience.ADULTS 
     ? "Masterpiece level, intricate black and white line art coloring page. Zentangle patterns, clean black outlines, no shading, no gray, purely white background. Subject: "
