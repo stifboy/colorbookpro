@@ -1,10 +1,11 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { ColoringBookData, TargetAudience, ColoringPage } from "../types";
-
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+import { ColoringBookData, TargetAudience, ColoringPage } from "../types.ts";
 
 export const generateBookMetadata = async (theme: string, audience: TargetAudience, authorName?: string): Promise<Partial<ColoringBookData>> => {
+  // Instantiate inside the function to get the latest process.env.API_KEY
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  
   const authorInstruction = authorName ? `The author's name is "${authorName}". Use it.` : "Provide a professional author pseudonym.";
   
   const response = await ai.models.generateContent({
@@ -45,34 +46,43 @@ export const generateBookMetadata = async (theme: string, audience: TargetAudien
 };
 
 export const generateColoringPage = async (theme: string, audience: TargetAudience, pageIndex: number): Promise<ColoringPage> => {
-  // Elaborate prompt based on audience
-  const basePrompt = audience === TargetAudience.ADULTS 
-    ? "Highly detailed, intricate black and white line art for coloring. Zentangle style, thin clean lines, no gray shading, pure white background, professional illustration."
-    : "Simple, thick bold black and white outlines for kids. Large sections for easy coloring, cute character, no small details, pure white background, friendly cartoon style.";
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
-  const prompt = `${basePrompt} Subject: ${theme}, specific scene variation ${pageIndex + 1}.`;
+  // Refined prompts for Gemini 3 Pro High Quality
+  const basePrompt = audience === TargetAudience.ADULTS 
+    ? "Masterpiece level, ultra-intricate black and white line art coloring page. Zentangle patterns, crisp thin black outlines, no shading, no gray, purely white background. Subject: "
+    : "Professional children's coloring page, bold thick black outlines, simple clear shapes, large coloring areas, cute and friendly character, white background. Subject: ";
+  
+  const prompt = `${basePrompt}${theme}, variation ${pageIndex + 1}. Ensure high contrast and print-readiness.`;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash-image',
+    model: 'gemini-3-pro-image-preview',
     contents: {
       parts: [{ text: prompt }]
     },
     config: {
       imageConfig: {
-        aspectRatio: "3:4", // Closest to 8.5x11
+        aspectRatio: "3:4",
+        imageSize: "1K" // High quality for print
       }
     }
   });
 
   let imageUrl = '';
-  for (const part of response.candidates?.[0]?.content?.parts || []) {
-    if (part.inlineData) {
-      imageUrl = `data:image/png;base64,${part.inlineData.data}`;
-      break;
+  // Pro models can return multiple parts; find the inline image data
+  const candidate = response.candidates?.[0];
+  if (candidate?.content?.parts) {
+    for (const part of candidate.content.parts) {
+      if (part.inlineData) {
+        imageUrl = `data:image/png;base64,${part.inlineData.data}`;
+        break;
+      }
     }
   }
 
-  if (!imageUrl) throw new Error("No image generated");
+  if (!imageUrl) {
+    throw new Error("No image data returned from Gemini 3 Pro. Ensure your API key has appropriate permissions.");
+  }
 
   return {
     id: Math.random().toString(36).substr(2, 9),
