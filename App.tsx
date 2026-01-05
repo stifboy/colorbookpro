@@ -1,15 +1,18 @@
 
-import React, { useState } from 'react';
-import { TargetAudience, ColoringBookData, GenerationProgress } from './types.ts';
-import { generateBookMetadata, generateColoringPage } from './services/geminiService.ts';
-import { generateKDPPdf } from './services/pdfService.ts';
-import InputForm from './components/InputForm.tsx';
-import BookPreview from './components/BookPreview.tsx';
-import LoadingOverlay from './components/LoadingOverlay.tsx';
-import Logo from './components/Logo.tsx';
-import { Printer, Layout, ShieldCheck } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { TargetAudience, ColoringBookData, GenerationProgress } from './types';
+import { generateBookMetadata, generateColoringPage } from './services/geminiService';
+import { generateKDPPdf } from './services/pdfService';
+import InputForm from './components/InputForm';
+import BookPreview from './components/BookPreview';
+import LoadingOverlay from './components/LoadingOverlay';
+import Logo from './components/Logo';
+import { Printer, ShieldCheck, Key, AlertCircle } from 'lucide-react';
+
+// Removed explicit 'aistudio' global declaration as it conflicts with the environment's pre-defined AIStudio type.
 
 const App: React.FC = () => {
+  const [hasApiKey, setHasApiKey] = useState<boolean>(true); // Assume true initially to avoid flicker
   const [theme, setTheme] = useState('');
   const [author, setAuthor] = useState('');
   const [audience, setAudience] = useState<TargetAudience>(TargetAudience.KIDS);
@@ -24,6 +27,27 @@ const App: React.FC = () => {
     message: ''
   });
 
+  useEffect(() => {
+    const checkKey = async () => {
+      // Use cast to any to safely access aistudio which is managed by the environment
+      const aistudio = (window as any).aistudio;
+      if (aistudio && typeof aistudio.hasSelectedApiKey === 'function') {
+        const selected = await aistudio.hasSelectedApiKey();
+        setHasApiKey(selected);
+      }
+    };
+    checkKey();
+  }, []);
+
+  const handleConnectKey = async () => {
+    const aistudio = (window as any).aistudio;
+    if (aistudio && typeof aistudio.openSelectKey === 'function') {
+      await aistudio.openSelectKey();
+      // Assume selection successful as per guidelines to mitigate potential race conditions
+      setHasApiKey(true);
+    }
+  };
+
   const handleGenerate = async () => {
     setIsGenerating(true);
     try {
@@ -36,7 +60,7 @@ const App: React.FC = () => {
           ...prev, 
           step: 'images', 
           current: i + 1, 
-          message: `Drawing page ${i + 1} with Gemini...` 
+          message: `Drawing page ${i + 1} with Gemini Pro...` 
         }));
         const page = await generateColoringPage(theme, audience, i);
         pages.push(page);
@@ -67,15 +91,13 @@ const App: React.FC = () => {
 
     } catch (err: any) {
       console.error("Gemini Generation Error:", err);
-      const errorMsg = err?.message || "An unexpected error occurred.";
-      
-      alert(
-        `Generation Failed: ${errorMsg}\n\n` +
-        `Possible Fixes:\n` +
-        `1. Check your API_KEY in Vercel settings.\n` +
-        `2. IMPORTANT: You MUST redeploy your project on Vercel for new environment variables to take effect.\n` +
-        `3. Ensure your project has billing enabled if using high-tier models.`
-      );
+      // Reset key selection if the request fails due to key/project issues
+      if (err?.message?.includes("Requested entity was not found") || err?.message?.includes("API_KEY")) {
+        setHasApiKey(false);
+        alert("API Key issue detected. Please click 'Connect API Key' to link a valid project.");
+      } else {
+        alert(`Generation Failed: ${err?.message || "Check console for details"}`);
+      }
       setIsGenerating(false);
     }
   };
@@ -104,16 +126,35 @@ const App: React.FC = () => {
       <nav className="bg-white border-b border-slate-200 sticky top-0 z-30 px-6 py-4 shadow-sm">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <Logo />
-          <div className="flex items-center gap-6">
-            <div className="hidden md:flex items-center gap-6 text-sm font-bold text-slate-400 uppercase tracking-widest">
-              <span className="flex items-center gap-1"><Printer size={16} /> KDP Safe</span>
-              <span className="flex items-center gap-1 text-emerald-600"><ShieldCheck size={16} /> Commercial Use</span>
-            </div>
+          <div className="flex items-center gap-4">
+            {!hasApiKey ? (
+              <button 
+                onClick={handleConnectKey}
+                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md transition-all active:scale-95"
+              >
+                <Key size={16} /> Connect API Key
+              </button>
+            ) : (
+              <div className="hidden md:flex items-center gap-6 text-sm font-bold text-slate-400 uppercase tracking-widest">
+                <span className="flex items-center gap-1"><Printer size={16} /> KDP Safe</span>
+                <span className="flex items-center gap-1 text-emerald-600"><ShieldCheck size={16} /> Commercial Use</span>
+              </div>
+            )}
           </div>
         </div>
       </nav>
 
       <main className="max-w-7xl mx-auto px-6 py-12">
+        {!hasApiKey && (
+          <div className="mb-8 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-4 text-amber-800">
+            <AlertCircle className="shrink-0" />
+            <div className="text-sm">
+              <p className="font-bold">Required Setup</p>
+              <p>You must select an API key from a paid GCP project to generate high-quality interiors. <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" className="underline font-bold">Learn about billing</a>.</p>
+            </div>
+          </div>
+        )}
+
         {!bookData ? (
           <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-24 mt-8">
             <div className="flex-1 space-y-8 text-center lg:text-left">
@@ -131,19 +172,6 @@ const App: React.FC = () => {
                 Optimized for Amazon KDP with 0.75" safety margins. 
                 Generate professional line art interiors with automated single-sided layout logic.
               </p>
-              
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 pt-6">
-                {[
-                  { label: "Pro Margins", desc: "No Cut-offs" },
-                  { label: "High Contrast", desc: "Pure Black/White" },
-                  { label: "PDF Ready", desc: "8.5\" x 11\"" }
-                ].map((feature, i) => (
-                  <div key={i} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm text-center lg:text-left">
-                    <p className="text-slate-900 font-bold text-sm">{feature.label}</p>
-                    <p className="text-slate-500 text-xs">{feature.desc}</p>
-                  </div>
-                ))}
-              </div>
             </div>
 
             <div className="flex-1 w-full">
