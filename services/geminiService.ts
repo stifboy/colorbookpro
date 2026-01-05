@@ -3,7 +3,6 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { ColoringBookData, TargetAudience, ColoringPage } from "../types.ts";
 
 export const generateBookMetadata = async (theme: string, audience: TargetAudience, authorName?: string): Promise<Partial<ColoringBookData>> => {
-  // Instantiate inside the function to get the latest process.env.API_KEY
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   const authorInstruction = authorName ? `The author's name is "${authorName}". Use it.` : "Provide a professional author pseudonym.";
@@ -48,28 +47,25 @@ export const generateBookMetadata = async (theme: string, audience: TargetAudien
 export const generateColoringPage = async (theme: string, audience: TargetAudience, pageIndex: number): Promise<ColoringPage> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
-  // Refined prompts for Gemini 3 Pro High Quality
   const basePrompt = audience === TargetAudience.ADULTS 
-    ? "Masterpiece level, ultra-intricate black and white line art coloring page. Zentangle patterns, crisp thin black outlines, no shading, no gray, purely white background. Subject: "
-    : "Professional children's coloring page, bold thick black outlines, simple clear shapes, large coloring areas, cute and friendly character, white background. Subject: ";
+    ? "Masterpiece level, intricate black and white line art coloring page. Zentangle patterns, clean black outlines, no shading, no gray, purely white background. Subject: "
+    : "Professional children's coloring page, thick black outlines, simple clear shapes, large coloring areas, friendly character, white background. Subject: ";
   
-  const prompt = `${basePrompt}${theme}, variation ${pageIndex + 1}. Ensure high contrast and print-readiness.`;
+  const prompt = `${basePrompt}${theme}, page ${pageIndex + 1}. High contrast, print-ready, black and white only.`;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3-pro-image-preview',
+    model: 'gemini-2.5-flash-image',
     contents: {
       parts: [{ text: prompt }]
     },
     config: {
       imageConfig: {
-        aspectRatio: "3:4",
-        imageSize: "1K" // High quality for print
+        aspectRatio: "3:4"
       }
     }
   });
 
   let imageUrl = '';
-  // Pro models can return multiple parts; find the inline image data
   const candidate = response.candidates?.[0];
   if (candidate?.content?.parts) {
     for (const part of candidate.content.parts) {
@@ -81,7 +77,7 @@ export const generateColoringPage = async (theme: string, audience: TargetAudien
   }
 
   if (!imageUrl) {
-    throw new Error("No image data returned from Gemini 3 Pro. Ensure your API key has appropriate permissions.");
+    throw new Error("No image data returned. Ensure your API_KEY is valid and has image generation permissions.");
   }
 
   return {

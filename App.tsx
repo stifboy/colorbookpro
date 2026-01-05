@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { TargetAudience, ColoringBookData, GenerationProgress } from './types.ts';
 import { generateBookMetadata, generateColoringPage } from './services/geminiService.ts';
 import { generateKDPPdf } from './services/pdfService.ts';
@@ -7,14 +7,7 @@ import InputForm from './components/InputForm.tsx';
 import BookPreview from './components/BookPreview.tsx';
 import LoadingOverlay from './components/LoadingOverlay.tsx';
 import Logo from './components/Logo.tsx';
-import { Printer, Layout, ShieldCheck, Key, AlertCircle } from 'lucide-react';
-
-declare global {
-  // Fix: Use the global AIStudio type instead of defining an inline literal that conflicts with the environment's definition.
-  interface Window {
-    aistudio?: AIStudio;
-  }
-}
+import { Printer, Layout, ShieldCheck } from 'lucide-react';
 
 const App: React.FC = () => {
   const [theme, setTheme] = useState('');
@@ -24,7 +17,6 @@ const App: React.FC = () => {
   const [bookData, setBookData] = useState<ColoringBookData | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
-  const [hasApiKey, setHasApiKey] = useState(true);
   const [progress, setProgress] = useState<GenerationProgress>({
     step: 'idle',
     total: 0,
@@ -32,31 +24,7 @@ const App: React.FC = () => {
     message: ''
   });
 
-  useEffect(() => {
-    const checkKey = async () => {
-      if (window.aistudio) {
-        const selected = await window.aistudio.hasSelectedApiKey();
-        setHasApiKey(selected);
-      }
-    };
-    checkKey();
-  }, []);
-
-  const handleSelectKey = async () => {
-    if (window.aistudio) {
-      // Trigger the key selection dialog.
-      await window.aistudio.openSelectKey();
-      // Assume success to avoid race conditions with hasSelectedApiKey() immediately after.
-      setHasApiKey(true);
-    }
-  };
-
   const handleGenerate = async () => {
-    if (!hasApiKey) {
-      await handleSelectKey();
-      return;
-    }
-
     setIsGenerating(true);
     try {
       setProgress({ step: 'text', total: pageCount + 1, current: 0, message: 'Drafting book structure...' });
@@ -68,7 +36,7 @@ const App: React.FC = () => {
           ...prev, 
           step: 'images', 
           current: i + 1, 
-          message: `Drawing page ${i + 1} with Gemini 3 Pro...` 
+          message: `Drawing page ${i + 1} with Gemini...` 
         }));
         const page = await generateColoringPage(theme, audience, i);
         pages.push(page);
@@ -89,7 +57,7 @@ const App: React.FC = () => {
         audience,
         theme,
         pages,
-        copyrightText: metadata.copyrightText || `© ${new Date().getFullYear()} ${author}. All rights reserved.`,
+        copyrightText: metadata.copyrightText || `© ${new Date().getFullYear()} ${author || 'AI Artist'}. All rights reserved.`,
         introduction: metadata.introduction || 'Welcome to your artistic journey.'
       };
 
@@ -99,13 +67,7 @@ const App: React.FC = () => {
 
     } catch (err: any) {
       console.error(err);
-      // Handle the case where the key might be invalid or project missing.
-      if (err.message?.includes("Requested entity was not found")) {
-        setHasApiKey(false);
-        alert("API connection issue. Please re-select your Gemini API key.");
-      } else {
-        alert("Generation error. Ensure you have an active Gemini API key selected.");
-      }
+      alert("Generation error. Please ensure your API_KEY is correctly configured in your environment variables.");
       setIsGenerating(false);
     }
   };
@@ -134,18 +96,10 @@ const App: React.FC = () => {
       <nav className="bg-white border-b border-slate-200 sticky top-0 z-30 px-6 py-4 shadow-sm">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <Logo />
-          <div className="flex items-center gap-4">
-            {!hasApiKey && (
-              <button 
-                onClick={handleSelectKey}
-                className="flex items-center gap-2 bg-amber-50 text-amber-700 px-4 py-2 rounded-lg text-sm font-bold border border-amber-200 hover:bg-amber-100 transition-colors"
-              >
-                <Key size={16} /> Connect API
-              </button>
-            )}
+          <div className="flex items-center gap-6">
             <div className="hidden md:flex items-center gap-6 text-sm font-bold text-slate-400 uppercase tracking-widest">
               <span className="flex items-center gap-1"><Printer size={16} /> KDP Safe</span>
-              <span className="flex items-center gap-1 text-emerald-600"><ShieldCheck size={16} /> Commercial</span>
+              <span className="flex items-center gap-1 text-emerald-600"><ShieldCheck size={16} /> Commercial Use</span>
             </div>
           </div>
         </div>
@@ -156,30 +110,32 @@ const App: React.FC = () => {
           <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-24 mt-8">
             <div className="flex-1 space-y-8 text-center lg:text-left">
               <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-700 px-4 py-2 rounded-full text-sm font-bold">
-                🎨 Gemini 3 Pro Generation
+                🎨 AI-Powered KDP Interiors
               </div>
               <h1 className="text-5xl lg:text-7xl font-black text-slate-900 leading-[1.1]">
-                Launch Your <br /> 
+                Create Your <br /> 
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600 font-hand">
-                  KDP Coloring 
+                  Coloring Book
                 </span>
-                <br />Business
+                <br />In Seconds
               </h1>
               <p className="text-xl text-slate-500 max-w-2xl">
-                The only generator with built-in Amazon KDP margin safety (0.75"). 
-                Generate intricate line art interiors with single-sided layout automation.
+                Optimized for Amazon KDP with 0.75" safety margins. 
+                Generate professional line art interiors with automated single-sided layout logic.
               </p>
               
-              {!hasApiKey && (
-                <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl flex items-start gap-3 max-w-lg">
-                  <AlertCircle className="text-amber-600 shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-amber-800 font-bold text-sm">API Key Required</p>
-                    <p className="text-amber-700 text-xs">To use Pro-tier image generation, you must connect a paid Gemini API key from a project with billing enabled.</p>
-                    <button onClick={handleSelectKey} className="mt-2 text-amber-900 text-xs font-black underline">Connect Now →</button>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 pt-6">
+                {[
+                  { label: "Pro Margins", desc: "No Cut-offs" },
+                  { label: "High Contrast", desc: "Pure Black/White" },
+                  { label: "PDF Ready", desc: "8.5\" x 11\"" }
+                ].map((feature, i) => (
+                  <div key={i} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm text-center lg:text-left">
+                    <p className="text-slate-900 font-bold text-sm">{feature.label}</p>
+                    <p className="text-slate-500 text-xs">{feature.desc}</p>
                   </div>
-                </div>
-              )}
+                ))}
+              </div>
             </div>
 
             <div className="flex-1 w-full">
@@ -220,7 +176,6 @@ const App: React.FC = () => {
           <p className="text-slate-400 text-sm italic">
             Automating KDP Interior Design. © {new Date().getFullYear()} ColorBook Pro.
           </p>
-          <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" className="text-slate-400 text-xs hover:underline">Billing Docs</a>
         </div>
       </footer>
 
