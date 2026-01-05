@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { TargetAudience, ColoringBookData, GenerationProgress } from './types';
 import { generateBookMetadata, generateColoringPage } from './services/geminiService';
 import { generateKDPPdf } from './services/pdfService';
@@ -7,11 +7,9 @@ import InputForm from './components/InputForm';
 import BookPreview from './components/BookPreview';
 import LoadingOverlay from './components/LoadingOverlay';
 import Logo from './components/Logo';
-import { Printer, ShieldCheck, Key, AlertCircle } from 'lucide-react';
+import { Printer, ShieldCheck } from 'lucide-react';
 
 const App: React.FC = () => {
-  const [hasApiKey, setHasApiKey] = useState<boolean>(true); 
-  const [isAIStudio, setIsAIStudio] = useState<boolean>(false);
   const [theme, setTheme] = useState('');
   const [author, setAuthor] = useState('');
   const [audience, setAudience] = useState<TargetAudience>(TargetAudience.KIDS);
@@ -25,32 +23,6 @@ const App: React.FC = () => {
     current: 0,
     message: ''
   });
-
-  useEffect(() => {
-    const checkEnvironment = async () => {
-      const aistudio = (window as any).aistudio;
-      const envKey = !!process.env.API_KEY;
-      
-      // Only trigger the "Connect" workflow if we are in an environment that explicitly supports it
-      if (aistudio && typeof aistudio.hasSelectedApiKey === 'function') {
-        setIsAIStudio(true);
-        const selected = await aistudio.hasSelectedApiKey();
-        setHasApiKey(selected || envKey);
-      } else {
-        setIsAIStudio(false);
-        setHasApiKey(envKey);
-      }
-    };
-    checkEnvironment();
-  }, []);
-
-  const handleConnectKey = async () => {
-    const aistudio = (window as any).aistudio;
-    if (aistudio && typeof aistudio.openSelectKey === 'function') {
-      await aistudio.openSelectKey();
-      setHasApiKey(true);
-    }
-  };
 
   const handleGenerate = async () => {
     setIsGenerating(true);
@@ -95,17 +67,8 @@ const App: React.FC = () => {
 
     } catch (err: any) {
       console.error("Gemini Generation Error:", err);
-      const errorMsg = err?.message || "";
-      
-      // Handle authentication failures by prompting for a key refresh if in AI Studio
-      if (errorMsg.includes("Requested entity was not found") || errorMsg.includes("API Key") || errorMsg.includes("401") || errorMsg.includes("403")) {
-        if (isAIStudio) {
-          setHasApiKey(false);
-        }
-        alert("Authentication Failed: Please ensure your API_KEY is correctly set in your environment.");
-      } else {
-        alert(`Generation Error: ${errorMsg || "An unexpected error occurred."}`);
-      }
+      const errorMsg = err?.message || "An unexpected error occurred.";
+      alert(`Generation Error: ${errorMsg}`);
       setIsGenerating(false);
     }
   };
@@ -134,35 +97,14 @@ const App: React.FC = () => {
       <nav className="bg-white border-b border-slate-200 sticky top-0 z-30 px-6 py-4 shadow-sm">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <Logo />
-          <div className="flex items-center gap-4">
-            {isAIStudio && !hasApiKey ? (
-              <button 
-                onClick={handleConnectKey}
-                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md transition-all active:scale-95"
-              >
-                <Key size={16} /> Connect API Key
-              </button>
-            ) : (
-              <div className="hidden md:flex items-center gap-6 text-sm font-bold text-slate-400 uppercase tracking-widest">
-                <span className="flex items-center gap-1"><Printer size={16} /> KDP Safe</span>
-                <span className="flex items-center gap-1 text-emerald-600"><ShieldCheck size={16} /> Commercial Use</span>
-              </div>
-            )}
+          <div className="hidden md:flex items-center gap-6 text-sm font-bold text-slate-400 uppercase tracking-widest">
+            <span className="flex items-center gap-1"><Printer size={16} /> KDP Safe</span>
+            <span className="flex items-center gap-1 text-emerald-600"><ShieldCheck size={16} /> Commercial Use</span>
           </div>
         </div>
       </nav>
 
       <main className="max-w-7xl mx-auto px-6 py-12">
-        {isAIStudio && !hasApiKey && (
-          <div className="mb-8 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-4 text-amber-800 animate-in fade-in slide-in-from-top-2">
-            <AlertCircle className="shrink-0" />
-            <div className="text-sm">
-              <p className="font-bold">API Key Selection Required</p>
-              <p>Generation requires a paid project key. Click <strong>Connect API Key</strong> in the header to link your project.</p>
-            </div>
-          </div>
-        )}
-
         {!bookData ? (
           <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-24 mt-8">
             <div className="flex-1 space-y-8 text-center lg:text-left">
