@@ -23,7 +23,7 @@ const Logo: React.FC<LogoProps> = ({ className = "", size = "md" }) => {
         </div>
       </div>
       <h1 className={`font-black tracking-tight text-slate-800 ${size === 'lg' ? 'text-3xl' : size === 'sm' ? 'text-lg' : 'text-xl'}`}>
-        ColorBook <span className="text-blue-600">Pro</span>
+        <span className="font-sans">ColorBook</span> <span className="text-blue-600 font-hand">Pro</span>
       </h1>
     </div>
   );
