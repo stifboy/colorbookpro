@@ -1,7 +1,7 @@
 
 import React from 'react';
-import { TargetAudience } from '../types';
-import { Sparkles, BookOpen, Users, Hash, User } from 'lucide-react';
+import { TargetAudience, AIProvider } from '../types';
+import { Sparkles, BookOpen, Users, Hash, User, Cpu } from 'lucide-react';
 
 interface InputFormProps {
   theme: string;
@@ -10,6 +10,8 @@ interface InputFormProps {
   setAuthor: (val: string) => void;
   audience: TargetAudience;
   setAudience: (val: TargetAudience) => void;
+  provider: AIProvider;
+  setProvider: (val: AIProvider) => void;
   pageCount: number;
   setPageCount: (val: number) => void;
   onGenerate: () => void;
@@ -17,7 +19,7 @@ interface InputFormProps {
 }
 
 const InputForm: React.FC<InputFormProps> = ({
-  theme, setTheme, author, setAuthor, audience, setAudience, pageCount, setPageCount, onGenerate, isGenerating
+  theme, setTheme, author, setAuthor, audience, setAudience, provider, setProvider, pageCount, setPageCount, onGenerate, isGenerating
 }) => {
   const inputClasses = "w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all shadow-sm";
 
@@ -52,6 +54,20 @@ const InputForm: React.FC<InputFormProps> = ({
             value={author}
             onChange={(e) => setAuthor(e.target.value)}
           />
+        </div>
+
+        <div>
+          <label className="flex items-center gap-2 text-sm font-semibold text-slate-700 mb-2">
+            <Cpu size={16} /> AI Provider
+          </label>
+          <select
+            className={inputClasses}
+            value={provider}
+            onChange={(e) => setProvider(e.target.value as AIProvider)}
+          >
+            <option value={AIProvider.GEMINI}>Gemini (Google)</option>
+            <option value={AIProvider.OPENAI}>OpenAI (GPT Image)</option>
+          </select>
         </div>
 
         <div className="grid grid-cols-2 gap-4">

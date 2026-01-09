@@ -4,6 +4,11 @@ export enum TargetAudience {
   ADULTS = 'Adults'
 }
 
+export enum AIProvider {
+  GEMINI = 'Gemini',
+  OPENAI = 'OpenAI'
+}
+
 export interface ColoringPage {
   id: string;
   title: string;

@@ -1,7 +1,8 @@
 
 import React, { useState } from 'react';
-import { TargetAudience, ColoringBookData, GenerationProgress } from './types';
-import { generateBookMetadata, generateColoringPage } from './services/geminiService';
+import { TargetAudience, ColoringBookData, GenerationProgress, AIProvider } from './types';
+import * as geminiService from './services/geminiService';
+import * as openaiService from './services/openaiService';
 import { generateKDPPdf } from './services/pdfService';
 import InputForm from './components/InputForm';
 import BookPreview from './components/BookPreview';
@@ -13,6 +14,7 @@ const App: React.FC = () => {
   const [theme, setTheme] = useState('');
   const [author, setAuthor] = useState('');
   const [audience, setAudience] = useState<TargetAudience>(TargetAudience.KIDS);
+  const [provider, setProvider] = useState<AIProvider>(AIProvider.GEMINI);
   const [pageCount, setPageCount] = useState(5);
   const [bookData, setBookData] = useState<ColoringBookData | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -26,19 +28,22 @@ const App: React.FC = () => {
 
   const handleGenerate = async () => {
     setIsGenerating(true);
+    const service = provider === AIProvider.OPENAI ? openaiService : geminiService;
+    const providerName = provider === AIProvider.OPENAI ? 'OpenAI' : 'Gemini';
+
     try {
-      setProgress({ step: 'text', total: pageCount + 1, current: 0, message: 'Drafting book structure...' });
-      const metadata = await generateBookMetadata(theme, audience, author);
+      setProgress({ step: 'text', total: pageCount + 1, current: 0, message: `Drafting book structure with ${providerName}...` });
+      const metadata = await service.generateBookMetadata(theme, audience, author);
 
       const pages = [];
       for (let i = 0; i < pageCount; i++) {
-        setProgress(prev => ({ 
-          ...prev, 
-          step: 'images', 
-          current: i + 1, 
-          message: `Drawing page ${i + 1} with Gemini Pro...` 
+        setProgress(prev => ({
+          ...prev,
+          step: 'images',
+          current: i + 1,
+          message: `Drawing page ${i + 1} with ${providerName}...`
         }));
-        const page = await generateColoringPage(theme, audience, i);
+        const page = await service.generateColoringPage(theme, audience, i);
         pages.push(page);
       }
 
@@ -66,7 +71,7 @@ const App: React.FC = () => {
       setTimeout(() => setIsGenerating(false), 1200);
 
     } catch (err: any) {
-      console.error("Gemini Generation Error:", err);
+      console.error(`${providerName} Generation Error:`, err);
       const errorMsg = err?.message || "An unexpected error occurred.";
       alert(`Generation Error: ${errorMsg}`);
       setIsGenerating(false);
@@ -131,6 +136,8 @@ const App: React.FC = () => {
                 setAuthor={setAuthor}
                 audience={audience}
                 setAudience={setAudience}
+                provider={provider}
+                setProvider={setProvider}
                 pageCount={pageCount}
                 setPageCount={setPageCount}
                 onGenerate={handleGenerate}
