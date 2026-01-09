@@ -75,10 +75,10 @@ export const generateColoringPage = async (theme: string, audience: TargetAudien
     model: "gpt-image-1",
     prompt,
     n: 1,
-    size: "1024x1536",
-    response_format: "b64_json"
+    size: "1024x1536"
   });
 
+  // gpt-image-1 returns base64 data directly
   const imageData = response.data[0]?.b64_json;
   if (!imageData) {
     throw new Error("No image data returned from OpenAI. Please verify your API key has image generation access.");
